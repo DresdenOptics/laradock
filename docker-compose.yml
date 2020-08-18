@@ -367,8 +367,11 @@ services:
       depends_on:
         - php-fpm
       networks:
-        - frontend
-        - backend
+        frontend:
+        backend:
+          aliases:
+            - api.dresden.localhost
+            - api-l6.dresden.localhost
 
 ### Blackfire ########################################
     blackfire:
