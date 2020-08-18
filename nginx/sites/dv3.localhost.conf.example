@@ -1,0 +1,110 @@
+server {
+    listen 80;
+    server_name     dresden.vision.localhost;
+    root            /var/www/dresden/dv3;
+    access_log      /var/log/nginx/dv3_access.log;
+    error_log       /var/log/nginx/dv3_error.log;
+
+    charset utf-8;
+    client_max_body_size 8M;
+
+    index index.php index.html;
+
+    location @nzrewrites {
+        rewrite ^/nz/(.*)$ /nz/index.php last;
+    }
+
+    location /nz/ {
+        try_files $uri $uri/ @nzrewrites;
+    }
+
+    location @aurewrites {
+        rewrite ^/au/(.*)$ /au/index.php last;
+    }
+
+    location /au/ {
+        try_files $uri $uri/ @aurewrites;
+    }
+
+    location @carewrites {
+        rewrite ^/ca/(.*)$ /ca/index.php last;
+    }
+
+    location /ca/ {
+        try_files $uri $uri/ @carewrites;
+    }
+
+    # Dynamically set the try_files locations.
+    # Statically cached files should only be loaded for GET requests.
+    set $try_files @default;
+    if ($request_method = GET) {
+        set $try_files @static;
+    }
+
+    # The files to try when its a potentially static cache request (ie. a GET request)
+    location @static {
+        try_files /static${uri}_${query_string}.html @default;
+    }
+
+    # The files to try when it's not a static cache request (ie. anything other than GET)
+    location @default {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Return a static file, if it exists, or pass to front controller
+    location / {
+        try_files $uri $try_files; # Use the dynamically assigned locations from above.
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass php-upstream;
+        fastcgi_index index.php;
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        #fixes timeouts
+        fastcgi_read_timeout 600;
+        include fastcgi_params;
+    }
+
+    location ~ /\.git {
+        deny all;
+    }
+
+    # Deny access to configuration files
+    location ~* ^/_config {
+        deny all;
+        return 404;
+    }
+
+    location ~ /(_app|_config|_content|/layouts/) {
+        deny all;
+        return 404;
+    }
+
+    location ~ /.(yml|yaml|html) { deny all; }
+
+    location ~ /(?!.well-known)(\.)\w+ {
+        deny all;
+    }
+
+    # Block access to Statamic, content, and cache locations
+    location ~ ^\/(statamic|local|(site\/(?!themes))) {
+        deny all;
+        return 404;
+    }
+    # End added 6 August 2020
+
+    # Enable gzip compression
+    # gzip on;
+    # gzip_min_length  1100;
+    # gzip_buffers  4 32k;
+    # gzip_types    text/plain application/x-javascript text/xml text/css;
+    # gzip_vary on;
+}
